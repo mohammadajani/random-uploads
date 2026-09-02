@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Deskline — study stream companion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg:#12141c;
+    --bg-panel:#181b26;
+    --bg-card:#1f2330;
+    --line:#2b3040;
+    --line-soft:#232735;
+    --text:#eef0f6;
+    --text-dim:#8d93a6;
+    --amber:#e8a54b;
+    --amber-soft:#3a2c17;
+    --amber-line:#5c4322;
+    --teal:#5fc9b8;
+    --teal-soft:#183430;
+    --teal-line:#25453f;
+    --danger:#e8615f;
+    --danger-soft:#3a1e1e;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Sora',system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  body.overview-mode{ background:transparent; }
+  .mono{ font-family:'JetBrains Mono',ui-monospace,monospace; }
+  #root{ min-height:100vh; }
+
+  /* ---------- shell ---------- */
+  .shell{ max-width:1180px; margin:0 auto; padding:28px 24px 60px; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; flex-wrap:wrap; gap:14px; }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-mark{ width:30px; height:30px; border-radius:8px; background:linear-gradient(135deg,var(--amber),#c97f2e); flex:none; }
+  .brand-name{ font-weight:700; font-size:17px; letter-spacing:.2px; }
+  .brand-sub{ color:var(--text-dim); font-size:12.5px; }
+  .tabs{ display:flex; gap:6px; background:var(--bg-panel); border:1px solid var(--line); padding:4px; border-radius:11px; }
+  .tab-btn{ border:none; background:transparent; color:var(--text-dim); padding:8px 16px; border-radius:8px; font-family:inherit; font-size:13.5px; font-weight:600; cursor:pointer; }
+  .tab-btn.active{ background:var(--bg-card); color:var(--text); }
+
+  .grid{ display:grid; grid-template-columns:340px 1fr; gap:20px; align-items:start; }
+  @media (max-width:860px){ .grid{ grid-template-columns:1fr; } }
+
+  .panel{ background:var(--bg-panel); border:1px solid var(--line); border-radius:var(--radius); padding:20px; }
+  .panel + .panel{ margin-top:18px; }
+  .panel-title{ font-size:13px; font-weight:600; color:var(--text); margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+  .panel-title .tick{ width:3px; height:14px; border-radius:2px; background:var(--amber); display:inline-block; }
+  .panel-sub{ color:var(--text-dim); font-size:12px; margin:0 0 16px; }
+
+  label.field{ display:block; margin-bottom:14px; }
+  label.field .flabel{ display:block; font-size:12.5px; color:var(--text-dim); margin-bottom:6px; }
+  .field input[type=number]{
+    width:100%; background:var(--bg-card); border:1px solid var(--line); color:var(--text);
+    padding:9px 11px; border-radius:8px; font-family:'JetBrains Mono',monospace; font-size:14px;
+  }
+  .field input[type=number]:focus{ outline:none; border-color:var(--amber-line); }
+  .row{ display:flex; gap:10px; }
+  .row .field{ flex:1; }
+
+  .mode-switch{ display:flex; background:var(--bg-card); border:1px solid var(--line); border-radius:9px; padding:3px; margin-bottom:16px; }
+  .mode-switch button{ flex:1; border:none; background:transparent; color:var(--text-dim); padding:8px 6px; border-radius:7px; font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .mode-switch button.active{ background:var(--amber-soft); color:var(--amber); box-shadow:inset 0 0 0 1px var(--amber-line); }
+
+  .preset-row{ display:flex; gap:8px; margin-bottom:14px; }
+  .preset-btn{ flex:1; background:var(--bg-card); border:1px solid var(--line); color:var(--text-dim); padding:8px 4px; border-radius:8px; font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .preset-btn.selected{ border-color:var(--amber-line); color:var(--amber); background:var(--amber-soft); }
+
+  .btn{ border:none; border-radius:9px; padding:11px 16px; font-family:inherit; font-weight:700; font-size:13.5px; cursor:pointer; width:100%; }
+  .btn + .btn{ margin-top:9px; }
+  .btn-primary{ background:var(--amber); color:#221604; }
+  .btn-outline{ background:transparent; color:var(--text); border:1px solid var(--line); }
+  .btn-danger{ background:var(--danger-soft); color:var(--danger); border:1px solid #5c2a2a; }
+  .btn-teal{ background:var(--teal); color:#08221d; }
+  .btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .btn-row{ display:flex; gap:9px; }
+  .btn-row .btn{ margin-top:0; }
+
+  .check-toggle{ display:flex; align-items:center; justify-content:space-between; background:var(--bg-card); border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin-top:4px; }
+  .check-toggle span{ font-size:12.5px; color:var(--text-dim); }
+  .switch{ width:36px; height:20px; border-radius:20px; background:var(--line); position:relative; cursor:pointer; flex:none; }
+  .switch.on{ background:var(--amber-line); }
+  .switch::after{ content:''; position:absolute; width:16px; height:16px; border-radius:50%; background:var(--text-dim); top:2px; left:2px; transition:transform .15s; }
+  .switch.on::after{ background:var(--amber); transform:translateX(16px); }
+
+  /* ---------- desk / timer ---------- */
+  .desk{ text-align:center; padding:34px 20px 26px; position:relative; overflow:hidden; }
+  .desk.phase-study{ background:radial-gradient(120% 140% at 50% -10%, var(--amber-soft), var(--bg-panel) 60%); }
+  .desk.phase-break{ background:radial-gradient(120% 140% at 50% -10%, var(--teal-soft), var(--bg-panel) 60%); }
+  .phase-pill{ display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:700; letter-spacing:.3px; padding:6px 14px; border-radius:20px; margin-bottom:18px; }
+  .phase-pill.study{ background:var(--amber-soft); color:var(--amber); border:1px solid var(--amber-line); }
+  .phase-pill.break{ background:var(--teal-soft); color:var(--teal); border:1px solid var(--teal-line); }
+  .phase-pill.idle{ background:var(--bg-card); color:var(--text-dim); border:1px solid var(--line); }
+  .phase-pill .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+  #timerDigits{ font-size:76px; font-weight:700; line-height:1; letter-spacing:1px; }
+  .desk-caption{ color:var(--text-dim); font-size:13px; margin-top:8px; }
+
+  .timeline{ margin:26px 4px 6px; }
+  .timeline-track{ display:flex; height:14px; border-radius:8px; overflow:hidden; background:var(--bg-card); border:1px solid var(--line); position:relative; }
+  .timeline-seg{ height:100%; position:relative; }
+  .timeline-seg.study{ background:var(--amber-line); }
+  .timeline-seg.study.done{ background:var(--amber); }
+  .timeline-seg.break{ background:var(--teal-line); }
+  .timeline-seg.break.done{ background:var(--teal); }
+  .timeline-seg + .timeline-seg{ border-left:1px solid var(--bg); }
+  .timeline-seg.current::after{ content:''; position:absolute; inset:0; box-shadow:inset 0 0 0 2px #fff5; }
+  .timeline-labels{ display:flex; justify-content:space-between; margin-top:8px; font-size:11.5px; color:var(--text-dim); }
+
+  .desk-actions{ display:flex; gap:10px; justify-content:center; margin-top:24px; flex-wrap:wrap; }
+  .desk-actions .btn{ width:auto; flex:1; min-width:120px; }
+
+  .stat-row{ display:flex; gap:12px; }
+  .stat-card{ flex:1; background:var(--bg-card); border:1px solid var(--line); border-radius:11px; padding:13px 14px; }
+  .stat-card .n{ font-family:'JetBrains Mono',monospace; font-size:19px; font-weight:700; }
+  .stat-card .l{ font-size:11.5px; color:var(--text-dim); margin-top:3px; }
+
+  /* ---------- todo ---------- */
+  .todo-add{ display:flex; gap:8px; margin-bottom:12px; }
+  .todo-add input{ flex:1; background:var(--bg-card); border:1px solid var(--line); color:var(--text); padding:10px 12px; border-radius:8px; font-family:inherit; font-size:13.5px; }
+  .todo-add input:focus{ outline:none; border-color:var(--amber-line); }
+  .todo-add button{ background:var(--amber); color:#221604; border:none; border-radius:8px; padding:0 15px; font-weight:700; cursor:pointer; }
+  .todo-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+  .todo-item{ display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--line); border-radius:9px; padding:9px 10px; }
+  .todo-check{ width:17px; height:17px; border-radius:5px; border:1.5px solid var(--line); flex:none; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--amber); font-size:12px; }
+  .todo-check.done{ background:var(--amber-soft); border-color:var(--amber-line); }
+  .todo-text{ flex:1; font-size:13.5px; }
+  .todo-text.done{ color:var(--text-dim); text-decoration:line-through; }
+  .todo-del{ background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:15px; padding:2px 6px; }
+  .todo-empty{ color:var(--text-dim); font-size:12.5px; padding:10px 2px; }
+
+  /* ---------- layout tab ---------- */
+  .canvas-wrap{ background:#0a0c12; border:1px solid var(--line); border-radius:12px; padding:10px; }
+  .canvas{ position:relative; width:100%; aspect-ratio:16/9; background:
+      linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0/ 10% 10%,
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px) 0 0/ 10% 10%,
+      #0d0f16; border-radius:8px; overflow:hidden; }
+  .lbox{ position:absolute; border:1.5px dashed var(--amber-line); background:var(--amber-soft); border-radius:8px; cursor:grab; display:flex; flex-direction:column; }
+  .lbox.todo{ border-color:var(--teal-line); background:var(--teal-soft); }
+  .lbox-head{ font-size:11px; font-weight:700; padding:5px 8px; color:var(--text-dim); display:flex; justify-content:space-between; align-items:center; }
+  .lbox-body{ flex:1; opacity:.7; font-size:10px; padding:0 8px 6px; overflow:hidden; }
+  .lbox-resize{ position:absolute; right:0; bottom:0; width:16px; height:16px; cursor:nwse-resize; }
+  .lbox-resize::after{ content:''; position:absolute; right:3px; bottom:3px; width:7px; height:7px; border-right:2px solid var(--text-dim); border-bottom:2px solid var(--text-dim); }
+  .layout-note{ color:var(--text-dim); font-size:12.5px; margin-top:14px; line-height:1.55; }
+  .layout-note code{ background:var(--bg-card); padding:1px 6px; border-radius:5px; font-family:'JetBrains Mono',monospace; font-size:11.5px; }
+  .vis-row{ display:flex; align-items:center; justify-content:space-between; margin-top:10px; }
+
+  /* ---------- modals ---------- */
+  .overlay{ position:fixed; inset:0; background:#080911cc; backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; z-index:40; padding:20px; }
+  .modal{ background:var(--bg-panel); border:1px solid var(--line); border-radius:16px; padding:26px; max-width:340px; width:100%; text-align:center; }
+  .modal h3{ margin:0 0 8px; font-size:17px; }
+  .modal p{ color:var(--text-dim); font-size:13.5px; margin:0 0 20px; line-height:1.5; }
+  .modal .btn-row{ gap:10px; }
+  .check-ring{ width:74px; height:74px; border-radius:50%; border:4px solid var(--amber-line); border-top-color:var(--amber); margin:0 auto 16px; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:20px; animation:spin 3s linear infinite; }
+  .check-ring span{ display:inline-block; animation:unspin 3s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+  @keyframes unspin{ to{ transform:rotate(-360deg);} }
+
+  /* ---------- overview (OBS) ---------- */
+  .ov-widget{ position:absolute; border-radius:14px; overflow:hidden; font-family:'Sora',sans-serif; color:#f4f5f9; }
+  .ov-timer{ background:linear-gradient(160deg, #1a1d29ee, #12141ce8); border:1px solid #ffffff22; padding:16px 18px; display:flex; flex-direction:column; justify-content:center; height:100%; }
+  .ov-timer .ov-phase{ font-size:.8em; font-weight:700; letter-spacing:.3px; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+  .ov-timer .ov-phase .dot{ width:7px; height:7px; border-radius:50%; }
+  .ov-timer .ov-digits{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:2.4em; line-height:1; }
+  .ov-timer .ov-bar{ height:6px; border-radius:4px; background:#ffffff22; margin-top:12px; overflow:hidden; }
+  .ov-timer .ov-bar-fill{ height:100%; border-radius:4px; }
+  .ov-todo{ background:#1a1d29ee; border:1px solid #ffffff22; padding:14px 16px; height:100%; overflow:hidden; }
+  .ov-todo h4{ margin:0 0 8px; font-size:.85em; color:#9aa0b3; font-weight:700; }
+  .ov-todo ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+  .ov-todo li{ font-size:.85em; display:flex; gap:8px; align-items:flex-start; }
+  .ov-todo li .b{ width:12px; height:12px; border-radius:4px; border:1.5px solid #6b7080; flex:none; margin-top:2px; }
+  .ov-todo li.done .b{ background:#e8a54b; border-color:#e8a54b; }
+  .ov-todo li.done span{ color:#7d8296; text-decoration:line-through; }
+  .ov-flash{ position:fixed; inset:0; background:#e8615f33; pointer-events:none; opacity:0; transition:opacity .3s; }
+  .ov-flash.show{ opacity:1; }
+  .ov-storage-warn{ position:fixed; bottom:10px; left:10px; font-size:11px; color:#e8615f; font-family:'JetBrains Mono',monospace; background:#0009; padding:4px 8px; border-radius:6px; }
+
+  /* ---------- firebase / link banners ---------- */
+  .fb-banner{ background:var(--danger-soft); border:1px solid #5c2a2a; color:#f3b9b8; border-radius:11px; padding:12px 16px; font-size:12.5px; line-height:1.5; margin-bottom:18px; }
+  .fb-banner b{ color:#fff; }
+  .link-box{ display:flex; gap:8px; background:var(--bg-card); border:1px solid var(--line); border-radius:9px; padding:8px 10px; margin-top:10px; align-items:center; }
+  .link-box input{ flex:1; background:transparent; border:none; color:var(--text-dim); font-family:'JetBrains Mono',monospace; font-size:11.5px; }
+  .link-box input:focus{ outline:none; }
+  .link-box button{ background:var(--bg-panel); border:1px solid var(--line); color:var(--text); border-radius:6px; padding:6px 10px; font-family:inherit; font-size:11.5px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function(){
+  "use strict";
+
+  // ---- fill this in with the config Firebase gives you for your Web App ----
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDSQJiFu_KsQNgarAXiqCo1baGMqO2pN3M",
+    authDomain: "mohammed-fc.firebaseapp.com",
+    databaseURL: "https://mohammed-fc.firebaseio.com",
+    projectId: "mohammed-fc"   
+  };
+
+  var params = new URLSearchParams(location.search);
+  var isOverview = params.get("view") === "overview";
+  if(isOverview) document.body.classList.add("overview-mode");
+
+  // ---- room id: keeps this device's dashboard + its own OBS overlay paired ----
+  var room = params.get("room");
+  if(!room){
+    try{ room = localStorage.getItem("deskline-room") || ""; }catch(e){ room = ""; }
+  }
+  if(!room){
+    room = Math.random().toString(36).slice(2,8);
+  }
+  try{ localStorage.setItem("deskline-room", room); }catch(e){}
+  if(!isOverview && params.get("room") !== room){
+    params.set("room", room);
+    var newUrl = location.pathname + "?" + params.toString();
+    history.replaceState(null, "", newUrl);
+  }
+
+  var storageOk = true;
+  var fbReady = false;
+  var fbDb = null;
+  (function initFirebase(){
+    try{
+      if(FIREBASE_CONFIG.databaseURL && FIREBASE_CONFIG.databaseURL.indexOf("YOUR_PROJECT") === -1 && window.firebase){
+        firebase.initializeApp(FIREBASE_CONFIG);
+        fbDb = firebase.database();
+        fbReady = true;
+      }
+    }catch(e){ fbReady = false; }
+  })();
+  function dbRef(){ return fbDb.ref("deskline/" + room + "/state"); }
+
+  function defaultState(){
+    return {
+      settings:{
+        mode:"ratio",
+        ratioStudy:5,
+        breakLen:10,
+        totalMin:120,
+        fixedTotalMin:120,
+        fixedNumBreaks:4,
+        suddenChecksEnabled:true,
+        checkMinGap:3,
+        checkMaxGap:8,
+        checkWindow:15
+      },
+      session:{
+        status:"idle",
+        phase:null,
+        phaseStartTs:null,
+        phaseDurationSec:null,
+        pausedRemainingSec:null,
+        plan:[],
+        planIndex:0
+      },
+      log:[],
+      stats:{ missedChecks:0 },
+      todos:[],
+      layout:{
+        timer:{ x:5, y:6, w:40, h:30, visible:true },
+        todo:{ x:5, y:40, w:40, h:54, visible:true }
+      }
+    };
+  }
+
+  var state = defaultState();
+
+  // ---------------- persistence (Firebase Realtime Database) ----------------
+  function sanitizeState(loaded){
+    var d = defaultState();
+    if(!loaded || typeof loaded !== "object") return d;
+    var m = Object.assign(d, loaded);
+    m.settings = Object.assign(d.settings, loaded.settings || {});
+    m.session = Object.assign(d.session, loaded.session || {});
+    m.session.plan = Array.isArray(loaded.session && loaded.session.plan) ? loaded.session.plan : [];
+    m.stats = Object.assign(d.stats, loaded.stats || {});
+    m.log = Array.isArray(loaded.log) ? loaded.log : [];
+    m.todos = Array.isArray(loaded.todos) ? loaded.todos : [];
+    m.layout = Object.assign(d.layout, loaded.layout || {});
+    m.layout.timer = Object.assign(d.layout.timer, (loaded.layout && loaded.layout.timer) || {});
+    m.layout.todo = Object.assign(d.layout.todo, (loaded.layout && loaded.layout.todo) || {});
+    return m;
+  }
+
+  function persist(){
+    if(isOverview) return;
+    if(!fbReady){ storageOk = false; renderStorageWarning(); return; }
+    try{
+      dbRef().set(state).catch(function(){ storageOk = false; renderStorageWarning(); });
+    }catch(e){ storageOk = false; renderStorageWarning(); }
+  }
+
+  function loadOnce(cb){
+    if(!fbReady){ storageOk = false; cb && cb(); return; }
+    try{
+      dbRef().get().then(function(snap){
+        if(snap && snap.exists()) state = sanitizeState(snap.val());
+        cb && cb();
+      }).catch(function(){ storageOk = false; cb && cb(); });
+    }catch(e){ storageOk = false; cb && cb(); }
+  }
+
+  function watchLive(){
+    if(!fbReady) return;
+    try{
+      dbRef().on("value", function(snap){
+        if(snap && snap.exists()) state = sanitizeState(snap.val());
+        render();
+      });
+    }catch(e){ storageOk = false; }
+  }
+
+  function renderStorageWarning(){
+    if(!isOverview) return;
+    if(document.getElementById("storageWarn")) return;
+    var w = document.createElement("div");
+    w.id = "storageWarn";
+    w.className = "ov-storage-warn";
+    w.textContent = fbReady ? "not synced — connection issue" : "not synced — Firebase not configured";
+    document.body.appendChild(w);
+  }
+
+  // ---------------- plan / algorithm ----------------
+  function buildPlan(s){
+    var plan = [];
+    if(s.mode === "ratio"){
+      var breakLen = Math.max(1, s.breakLen);
+      var studyLen = Math.max(1, s.ratioStudy) * breakLen;
+      var remaining = s.totalMin;
+      while(remaining > 0){
+        var sMin = Math.min(studyLen, remaining);
+        plan.push({ phase:"study", durationSec: sMin*60 });
+        remaining -= sMin;
+        if(remaining <= 0) break;
+        var bMin = Math.min(breakLen, remaining);
+        plan.push({ phase:"break", durationSec: bMin*60 });
+        remaining -= bMin;
+      }
+    } else {
+      var N = Math.max(0, s.fixedNumBreaks);
+      var bl = Math.max(1, s.breakLen);
+      var totalBreak = N*bl;
+      var studyTotal = Math.max(s.fixedTotalMin - totalBreak, N+1);
+      var block = studyTotal/(N+1);
+      for(var i=0;i<N+1;i++){
+        plan.push({ phase:"study", durationSec: block*60 });
+        if(i<N) plan.push({ phase:"break", durationSec: bl*60 });
+      }
+    }
+    return plan;
+  }
+
+  // ---------------- session control ----------------
+  function startSession(){
+    state.session.plan = buildPlan(state.settings);
+    if(!state.session.plan.length) return;
+    state.session.planIndex = 0;
+    var first = state.session.plan[0];
+    state.session.status = "running";
+    state.session.phase = first.phase;
+    state.session.phaseStartTs = Date.now();
+    state.session.phaseDurationSec = first.durationSec;
+    state.log = [];
+    state.stats.missedChecks = 0;
+    persist(); render();
+    scheduleSuddenCheck();
+  }
+
+  function remainingSec(){
+    var s = state.session;
+    if(s.status === "paused") return s.pausedRemainingSec;
+    if(!s.phaseStartTs) return 0;
+    return Math.max(0, s.phaseDurationSec - (Date.now()-s.phaseStartTs)/1000);
+  }
+
+  function logCurrentPhase(endTs){
+    var s = state.session;
+    if(s.phase && s.phaseStartTs){
+      state.log.push({ phase:s.phase, start:s.phaseStartTs, end:endTs });
+    }
+  }
+
+  function advancePhase(){
+    var s = state.session;
+    logCurrentPhase(Date.now());
+    s.planIndex++;
+    if(s.planIndex >= s.plan.length){
+      s.status = "idle"; s.phase = null; s.phaseStartTs = null; s.phaseDurationSec = null;
+      clearSuddenCheck();
+    } else {
+      var next = s.plan[s.planIndex];
+      s.phase = next.phase; s.phaseStartTs = Date.now(); s.phaseDurationSec = next.durationSec;
+      if(next.phase === "study") scheduleSuddenCheck(); else clearSuddenCheck();
+    }
+    persist(); render();
+  }
+
+  function pauseSession(){
+    var s = state.session;
+    if(s.status !== "running") return;
+    s.pausedRemainingSec = remainingSec();
+    s.status = "paused";
+    clearSuddenCheck();
+    persist(); render();
+  }
+
+  function resumeSession(){
+    var s = state.session;
+    if(s.status !== "paused") return;
+    s.status = "running";
+    s.phaseStartTs = Date.now();
+    s.phaseDurationSec = s.pausedRemainingSec;
+    s.pausedRemainingSec = null;
+    persist(); render();
+    if(s.phase === "study") scheduleSuddenCheck();
+  }
+
+  function stopSession(){
+    var s = state.session;
+    if(s.phase) logCurrentPhase(Date.now());
+    state.session = { status:"idle", phase:null, phaseStartTs:null, phaseDurationSec:null, pausedRemainingSec:null, plan:[], planIndex:0 };
+    clearSuddenCheck();
+    persist(); render();
+  }
+
+  function takeBreakNow(){
+    var s = state.session;
+    if(s.status !== "running" || s.phase !== "study") return;
+    logCurrentPhase(Date.now());
+    var nextIdx = s.planIndex+1;
+    if(s.plan[nextIdx] && s.plan[nextIdx].phase === "break"){
+      s.planIndex = nextIdx;
+      s.phaseDurationSec = s.plan[nextIdx].durationSec;
+    } else {
+      s.plan.splice(nextIdx, 0, { phase:"break", durationSec: state.settings.breakLen*60 });
+      s.planIndex = nextIdx;
+      s.phaseDurationSec = state.settings.breakLen*60;
+    }
+    s.phase = "break";
+    s.phaseStartTs = Date.now();
+    clearSuddenCheck();
+    persist(); render();
+  }
+
+  function endBreakNow(){
+    var s = state.session;
+    if(s.status !== "running" || s.phase !== "break") return;
+    logCurrentPhase(Date.now());
+    var nextIdx = s.planIndex+1;
+    if(s.plan[nextIdx]){
+      s.planIndex = nextIdx;
+      s.phase = s.plan[nextIdx].phase;
+      s.phaseDurationSec = s.plan[nextIdx].durationSec;
+    } else {
+      s.status = "idle"; s.phase = null; s.phaseDurationSec = null;
+    }
+    s.phaseStartTs = Date.now();
+    persist(); render();
+    if(s.phase === "study") scheduleSuddenCheck();
+  }
+
+  // ---------------- sudden checks ----------------
+  var checkTimer = null;
+  var checkDeadlineTs = null;
+  var checkTickInterval = null;
+
+  function clearSuddenCheck(){
+    if(checkTimer){ clearTimeout(checkTimer); checkTimer = null; }
+    if(checkTickInterval){ clearInterval(checkTickInterval); checkTickInterval = null; }
+    checkDeadlineTs = null;
+    ui.checkOpen = false;
+  }
+
+  function scheduleSuddenCheck(){
+    if(isOverview) return;
+    if(checkTimer) clearTimeout(checkTimer);
+    var st = state.settings;
+    if(!st.suddenChecksEnabled) return;
+    if(state.session.status !== "running" || state.session.phase !== "study") return;
+    var minG = Math.max(1, st.checkMinGap), maxG = Math.max(minG, st.checkMaxGap);
+    var gapMin = minG + Math.random()*(maxG-minG);
+    checkTimer = setTimeout(triggerSuddenCheck, gapMin*60*1000);
+  }
+
+  function triggerSuddenCheck(){
+    if(state.session.status !== "running" || state.session.phase !== "study") return;
+    ui.checkOpen = true;
+    checkDeadlineTs = Date.now() + state.settings.checkWindow*1000;
+    playBeep();
+    render();
+    checkTickInterval = setInterval(function(){
+      var left = Math.ceil((checkDeadlineTs - Date.now())/1000);
+      var el = document.getElementById("checkSeconds");
+      if(el) el.textContent = Math.max(0,left);
+      if(left <= 0){
+        clearInterval(checkTickInterval); checkTickInterval = null;
+        state.stats.missedChecks = (state.stats.missedChecks||0) + 1;
+        ui.checkOpen = false;
+        persist(); render();
+        flashOverviewLocal();
+        scheduleSuddenCheck();
+      }
+    }, 200);
+  }
+
+  function confirmAlive(){
+    if(checkTickInterval){ clearInterval(checkTickInterval); checkTickInterval = null; }
+    ui.checkOpen = false;
+    render();
+    scheduleSuddenCheck();
+  }
+
+  function playBeep(){
+    try{
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      var ctx = new Ctx();
+      [0,0.18].forEach(function(delay){
+        var o = ctx.createOscillator(); var g = ctx.createGain();
+        o.type = "sine"; o.frequency.value = 720;
+        o.connect(g); g.connect(ctx.destination);
+        var t = ctx.currentTime + delay;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.18, t+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t+0.16);
+        o.start(t); o.stop(t+0.18);
+      });
+    }catch(e){}
+  }
+
+  function flashOverviewLocal(){
+    // only meaningful within the dashboard's own view; overview instances
+    // pick up missedChecks via poll and flash themselves.
+  }
+
+  // ---------------- todos ----------------
+  function addTodo(text){
+    text = (text||"").trim();
+    if(!text) return;
+    state.todos.push({ id: String(Date.now())+Math.random().toString(16).slice(2), text:text, done:false });
+    persist(); render();
+  }
+  function toggleTodo(id){
+    var t = state.todos.find(function(t){ return t.id===id; });
+    if(t){ t.done = !t.done; persist(); render(); }
+  }
+  function deleteTodo(id){
+    state.todos = state.todos.filter(function(t){ return t.id!==id; });
+    persist(); render();
+  }
+
+  // ---------------- ui-local (not persisted) ----------------
+  var ui = { tab:"dashboard", confirmOpen:false, checkOpen:false, drag:null };
+
+  function overviewUrl(){
+    return location.origin + location.pathname + "?room=" + room + "&view=overview";
+  }
+
+  // ---------------- formatting ----------------
+  function fmt(sec){
+    sec = Math.max(0, Math.round(sec));
+    var h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+    function p(n){ return (n<10?"0":"")+n; }
+    return h>0 ? (h+":"+p(m)+":"+p(s)) : (p(m)+":"+p(s));
+  }
+  function fmtMin(totalSec){
+    var m = Math.round(totalSec/60);
+    var h = Math.floor(m/60); m = m%60;
+    return h>0 ? (h+"h "+m+"m") : (m+"m");
+  }
+
+  function computeStats(){
+    var focused = 0, breakTot = 0, cycles = 0;
+    state.log.forEach(function(e){
+      var d = (e.end-e.start)/1000;
+      if(e.phase==="study"){ focused += d; cycles++; }
+      else breakTot += d;
+    });
+    if(state.session.status==="running" && state.session.phase==="study"){
+      focused += (Date.now()-state.session.phaseStartTs)/1000;
+    }
+    return { focused:focused, breakTot:breakTot, cycles:cycles, missed: state.stats.missedChecks||0 };
+  }
+
+  // ================= RENDER: DASHBOARD =================
+  function esc(str){
+    return String(str).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function renderDashboard(){
+    var root = document.getElementById("root");
+    var s = state.settings, sess = state.session;
+    var running = sess.status === "running";
+    var paused = sess.status === "paused";
+    var active = running || paused;
+
+    root.innerHTML =
+      '<div class="shell">' +
+        '<div class="topbar">' +
+          '<div class="brand"><div class="brand-mark"></div><div><div class="brand-name">Deskline</div><div class="brand-sub">study-stream companion</div></div></div>' +
+          '<div class="tabs">' +
+            '<button class="tab-btn '+(ui.tab==="dashboard"?"active":"")+'" data-action="tab" data-tab="dashboard">Dashboard</button>' +
+            '<button class="tab-btn '+(ui.tab==="layout"?"active":"")+'" data-action="tab" data-tab="layout">Overlay layout</button>' +
+          '</div>' +
+        '</div>' +
+        (!fbReady ? '<div class="fb-banner"><b>Firebase isn\'t configured yet.</b> Settings, stats and the to-do list won\'t be saved or synced to your OBS overlay until you add your Firebase config near the top of the &lt;script&gt; block. See the README for setup steps.</div>' : "") +
+        (ui.tab==="dashboard" ? renderDashboardTab() : renderLayoutTab()) +
+      '</div>' +
+      (ui.confirmOpen ? renderConfirmModal() : "") +
+      (ui.checkOpen ? renderCheckModal() : "");
+
+    bindDashboardEvents();
+    if(ui.tab==="layout") bindLayoutDrag();
+  }
+
+  function renderDashboardTab(){
+    var s = state.settings, sess = state.session;
+    var running = sess.status === "running";
+    var paused = sess.status === "paused";
+    var active = running || paused;
+    var stats = computeStats();
+
+    var left =
+      '<div class="panel">' +
+        '<h3 class="panel-title"><span class="tick"></span>Session setup</h3>' +
+        '<p class="panel-sub">Choose a ratio + total time, or a total time + break count. Deskline works out the rest.</p>' +
+        '<div class="mode-switch">' +
+          '<button data-action="mode" data-mode="ratio" class="'+(s.mode==="ratio"?"active":"")+'" '+(active?"disabled":"")+'>Ratio + time</button>' +
+          '<button data-action="mode" data-mode="fixed" class="'+(s.mode==="fixed"?"active":"")+'" '+(active?"disabled":"")+'>Time + breaks</button>' +
+        '</div>' +
+        (s.mode==="ratio" ? renderRatioFields(s, active) : renderFixedFields(s, active)) +
+        '<label class="field"><span class="flabel">Break length (min)</span><input type="number" min="1" data-field="breakLen" value="'+s.breakLen+'" '+(active?"disabled":"")+'></label>' +
+        '<div class="check-toggle">' +
+          '<span>Sudden "still there?" checks</span>' +
+          '<div class="switch '+(s.suddenChecksEnabled?"on":"")+'" data-action="toggleChecks"></div>' +
+        '</div>' +
+        (s.suddenChecksEnabled ?
+          '<div class="row" style="margin-top:12px;">' +
+            '<label class="field"><span class="flabel">Every (min, min)</span><input type="number" min="1" data-field="checkMinGap" value="'+s.checkMinGap+'"></label>' +
+            '<label class="field"><span class="flabel">to (min, max)</span><input type="number" min="1" data-field="checkMaxGap" value="'+s.checkMaxGap+'"></label>' +
+          '</div>' : "") +
+        (active ?
+          '<div class="btn-row"><button class="btn '+(paused?"btn-primary":"btn-outline")+'" data-action="'+(paused?"resume":"pause")+'">'+(paused?"Resume":"Pause")+'</button>' +
+          '<button class="btn btn-danger" data-action="stop">Stop</button></div>'
+          : '<button class="btn btn-primary" data-action="start">Start session</button>') +
+      '</div>' +
+      '<div class="panel">' +
+        '<h3 class="panel-title"><span class="tick"></span>Stats</h3>' +
+        '<div class="stat-row">' +
+          '<div class="stat-card"><div class="n">'+fmtMin(stats.focused)+'</div><div class="l">focused</div></div>' +
+          '<div class="stat-card"><div class="n">'+stats.cycles+'</div><div class="l">study blocks</div></div>' +
+          '<div class="stat-card"><div class="n">'+stats.missed+'</div><div class="l">missed checks</div></div>' +
+        '</div>' +
+      '</div>';
+
+    var timelineHtml = renderTimeline();
+    var phaseLabel = sess.phase==="study" ? "deep study" : sess.phase==="break" ? "on break" : "ready";
+    var pillClass = sess.phase==="study" ? "study" : sess.phase==="break" ? "break" : "idle";
+    var digits = active ? fmt(remainingSec()) : "00:00";
+
+    var right =
+      '<div class="panel desk phase-'+(sess.phase||"idle")+'">' +
+        '<div class="phase-pill '+pillClass+'"><span class="dot"></span>'+(paused?"paused":phaseLabel)+'</div>' +
+        '<div id="timerDigits" class="mono">'+digits+'</div>' +
+        '<div class="desk-caption">'+(active ? ("block "+(sess.planIndex+1)+" of "+sess.plan.length) : "set up a session and hit start")+'</div>' +
+        timelineHtml +
+        '<div class="desk-actions">' +
+          (running && sess.phase==="study" ? '<button class="btn btn-outline" data-action="takeBreak">Take a break</button>' : "") +
+          (running && sess.phase==="break" ? '<button class="btn btn-teal" data-action="endBreak">Back to studying</button>' : "") +
+        '</div>' +
+      '</div>' +
+      '<div class="panel">' +
+        '<h3 class="panel-title"><span class="tick"></span>To-do</h3>' +
+        '<div class="todo-add"><input id="todoInput" type="text" placeholder="Add a task…"><button data-action="addTodo">Add</button></div>' +
+        '<ul class="todo-list">' + renderTodoItems() + '</ul>' +
+      '</div>';
+
+    return '<div class="grid"><div>'+left+'</div><div>'+right+'</div></div>';
+  }
+
+  function renderRatioFields(s, active){
+    return '<div class="preset-row">' +
+        '<button class="preset-btn '+(s.ratioStudy===5?"selected":"")+'" data-action="preset" data-ratio="5" '+(active?"disabled":"")+'>5 : 1</button>' +
+        '<button class="preset-btn '+(s.ratioStudy===4?"selected":"")+'" data-action="preset" data-ratio="4" '+(active?"disabled":"")+'>4 : 1</button>' +
+        '<button class="preset-btn '+([4,5].indexOf(s.ratioStudy)===-1?"selected":"")+'" data-action="preset" data-ratio="custom" '+(active?"disabled":"")+'>custom</button>' +
+      '</div>' +
+      '<div class="row">' +
+        '<label class="field"><span class="flabel">Study : break ratio</span><input type="number" min="1" data-field="ratioStudy" value="'+s.ratioStudy+'" '+(active?"disabled":"")+'></label>' +
+        '<label class="field"><span class="flabel">Total session (min)</span><input type="number" min="10" data-field="totalMin" value="'+s.totalMin+'" '+(active?"disabled":"")+'></label>' +
+      '</div>';
+  }
+  function renderFixedFields(s, active){
+    return '<div class="row">' +
+        '<label class="field"><span class="flabel">Total session (min)</span><input type="number" min="10" data-field="fixedTotalMin" value="'+s.fixedTotalMin+'" '+(active?"disabled":"")+'></label>' +
+        '<label class="field"><span class="flabel">Number of breaks</span><input type="number" min="0" data-field="fixedNumBreaks" value="'+s.fixedNumBreaks+'" '+(active?"disabled":"")+'></label>' +
+      '</div>';
+  }
+
+  function renderTimeline(){
+    var sess = state.session;
+    if(!sess.plan.length) return '<div class="timeline"><div class="timeline-track"></div></div>';
+    var total = sess.plan.reduce(function(a,b){ return a+b.durationSec; },0);
+    var segs = sess.plan.map(function(p,i){
+      var pct = (p.durationSec/total*100).toFixed(2);
+      var done = i < sess.planIndex;
+      var cur = i === sess.planIndex;
+      return '<div class="timeline-seg '+p.phase+' '+(done?"done":"")+' '+(cur?"current":"")+'" style="width:'+pct+'%"></div>';
+    }).join("");
+    return '<div class="timeline"><div class="timeline-track">'+segs+'</div>' +
+      '<div class="timeline-labels"><span>start</span><span>'+Math.round(total/60)+' min planned</span></div></div>';
+  }
+
+  function renderTodoItems(){
+    if(!state.todos.length) return '<div class="todo-empty">no tasks yet — add what you\'re working on</div>';
+    return state.todos.map(function(t){
+      return '<li class="todo-item">' +
+        '<div class="todo-check '+(t.done?"done":"")+'" data-action="toggleTodo" data-id="'+t.id+'">'+(t.done?"✓":"")+'</div>' +
+        '<div class="todo-text '+(t.done?"done":"")+'">'+esc(t.text)+'</div>' +
+        '<button class="todo-del" data-action="deleteTodo" data-id="'+t.id+'">×</button>' +
+      '</li>';
+    }).join("");
+  }
+
+  function renderConfirmModal(){
+    return '<div class="overlay"><div class="modal">' +
+      '<h3>Take a break now?</h3>' +
+      '<p>This ends the current study block early and starts your break timer.</p>' +
+      '<div class="btn-row"><button class="btn btn-outline" data-action="confirmNo">Keep studying</button>' +
+      '<button class="btn btn-primary" data-action="confirmYes">Yes, break</button></div>' +
+    '</div></div>';
+  }
+
+  function renderCheckModal(){
+    var left = checkDeadlineTs ? Math.max(0, Math.ceil((checkDeadlineTs-Date.now())/1000)) : state.settings.checkWindow;
+    return '<div class="overlay"><div class="modal">' +
+      '<div class="check-ring"><span id="checkSeconds">'+left+'</span></div>' +
+      '<h3>Still with us?</h3>' +
+      '<p>Random focus check — tap below to confirm you\'re at your desk.</p>' +
+      '<button class="btn btn-primary" data-action="confirmAlive">I\'m here</button>' +
+    '</div></div>';
+  }
+
+  // ================= LAYOUT TAB =================
+  function renderLayoutTab(){
+    var l = state.layout;
+    return '<div class="panel">' +
+      '<h3 class="panel-title"><span class="tick"></span>Overlay layout</h3>' +
+      '<p class="panel-sub">Drag and resize the widgets on the 16:9 canvas below — this is exactly how they\'ll sit on your stream overlay.</p>' +
+      '<div class="canvas-wrap"><div class="canvas" id="layoutCanvas">' +
+        boxHtml("timer","Timer", l.timer) +
+        boxHtml("todo","To-do", l.todo) +
+      '</div></div>' +
+      '<div class="vis-row"><span class="panel-sub" style="margin:0;">Show timer</span><div class="switch '+(l.timer.visible?"on":"")+'" data-action="toggleVis" data-key="timer"></div></div>' +
+      '<div class="vis-row"><span class="panel-sub" style="margin:0;">Show to-do</span><div class="switch '+(l.todo.visible?"on":"")+'" data-action="toggleVis" data-key="todo"></div></div>' +
+      '<p class="layout-note">Add this as an OBS <b>Browser Source</b>, sized to 16:9 (e.g. 1920×1080) with transparency enabled. The link below is tied to this device\'s room — copy it exactly as-is:</p>' +
+      '<div class="link-box"><input readonly value="'+esc(overviewUrl())+'" onclick="this.select()"><button data-action="copyLink">Copy</button></div>' +
+    '</div>';
+  }
+
+  function boxHtml(key, label, box){
+    return '<div class="lbox '+key+'" data-box="'+key+'" style="left:'+box.x+'%;top:'+box.y+'%;width:'+box.w+'%;height:'+box.h+'%;opacity:'+(box.visible?1:.35)+'">' +
+      '<div class="lbox-head">'+label+'<span>⋮⋮</span></div>' +
+      '<div class="lbox-body">preview</div>' +
+      '<div class="lbox-resize" data-resize="'+key+'"></div>' +
+    '</div>';
+  }
+
+  function bindLayoutDrag(){
+    var canvas = document.getElementById("layoutCanvas");
+    if(!canvas) return;
+    canvas.querySelectorAll(".lbox").forEach(function(box){
+      var key = box.dataset.box;
+      box.addEventListener("pointerdown", function(e){
+        if(e.target.dataset.resize) return;
+        var rect = canvas.getBoundingClientRect();
+        var l = state.layout[key];
+        var startX = e.clientX, startY = e.clientY;
+        var origX = l.x, origY = l.y;
+        function move(ev){
+          var dx = (ev.clientX-startX)/rect.width*100;
+          var dy = (ev.clientY-startY)/rect.height*100;
+          l.x = Math.max(0, Math.min(100-l.w, origX+dx));
+          l.y = Math.max(0, Math.min(100-l.h, origY+dy));
+          box.style.left = l.x+"%"; box.style.top = l.y+"%";
+        }
+        function up(){
+          document.removeEventListener("pointermove", move);
+          document.removeEventListener("pointerup", up);
+          persist();
+        }
+        document.addEventListener("pointermove", move);
+        document.addEventListener("pointerup", up);
+      });
+    });
+    canvas.querySelectorAll("[data-resize]").forEach(function(handle){
+      handle.addEventListener("pointerdown", function(e){
+        e.stopPropagation();
+        var key = handle.dataset.resize;
+        var box = canvas.querySelector('.lbox[data-box="'+key+'"]');
+        var rect = canvas.getBoundingClientRect();
+        var l = state.layout[key];
+        var startX = e.clientX, startY = e.clientY;
+        var origW = l.w, origH = l.h;
+        function move(ev){
+          var dx = (ev.clientX-startX)/rect.width*100;
+          var dy = (ev.clientY-startY)/rect.height*100;
+          l.w = Math.max(12, Math.min(100-l.x, origW+dx));
+          l.h = Math.max(10, Math.min(100-l.y, origH+dy));
+          box.style.width = l.w+"%"; box.style.height = l.h+"%";
+        }
+        function up(){
+          document.removeEventListener("pointermove", move);
+          document.removeEventListener("pointerup", up);
+          persist();
+        }
+        document.addEventListener("pointermove", move);
+        document.addEventListener("pointerup", up);
+      });
+    });
+  }
+
+  // ================= EVENTS =================
+  function bindDashboardEvents(){
+    var root = document.getElementById("root");
+    root.onclick = function(e){
+      var el = e.target.closest("[data-action]");
+      if(!el) return;
+      var a = el.dataset.action;
+      if(a==="tab"){ ui.tab = el.dataset.tab; render(); }
+      else if(a==="mode"){ state.settings.mode = el.dataset.mode; persist(); render(); }
+      else if(a==="preset"){
+        if(el.dataset.ratio!=="custom") state.settings.ratioStudy = parseInt(el.dataset.ratio,10);
+        persist(); render();
+      }
+      else if(a==="toggleChecks"){ state.settings.suddenChecksEnabled = !state.settings.suddenChecksEnabled; persist(); render(); }
+      else if(a==="start"){ startSession(); }
+      else if(a==="pause"){ pauseSession(); }
+      else if(a==="resume"){ resumeSession(); scheduleSuddenCheck(); }
+      else if(a==="stop"){ stopSession(); }
+      else if(a==="takeBreak"){ ui.confirmOpen = true; render(); }
+      else if(a==="confirmYes"){ ui.confirmOpen = false; takeBreakNow(); }
+      else if(a==="confirmNo"){ ui.confirmOpen = false; render(); }
+      else if(a==="endBreak"){ endBreakNow(); }
+      else if(a==="confirmAlive"){ confirmAlive(); }
+      else if(a==="addTodo"){ var inp = document.getElementById("todoInput"); addTodo(inp.value); inp.value=""; }
+      else if(a==="toggleTodo"){ toggleTodo(el.dataset.id); }
+      else if(a==="deleteTodo"){ deleteTodo(el.dataset.id); }
+      else if(a==="toggleVis"){ var k=el.dataset.key; state.layout[k].visible = !state.layout[k].visible; persist(); render(); }
+      else if(a==="copyLink"){
+        var linkInput = el.previousElementSibling;
+        if(linkInput){
+          linkInput.select();
+          try{ document.execCommand("copy"); }catch(e){}
+          if(navigator.clipboard) navigator.clipboard.writeText(linkInput.value).catch(function(){});
+          el.textContent = "Copied";
+          setTimeout(function(){ el.textContent = "Copy"; }, 1500);
+        }
+      }
+    };
+    root.onkeydown = function(e){
+      if(e.target && e.target.id==="todoInput" && e.key==="Enter"){ addTodo(e.target.value); e.target.value=""; }
+    };
+    root.onchange = function(e){
+      var f = e.target.dataset && e.target.dataset.field;
+      if(!f) return;
+      var v = parseFloat(e.target.value);
+      if(isNaN(v)) return;
+      state.settings[f] = v;
+      persist();
+    };
+  }
+
+  // ================= RENDER: OVERVIEW =================
+  var ovFlashUntil = 0;
+  function renderOverview(){
+    var root = document.getElementById("root");
+    var sess = state.session;
+    var l = state.layout;
+    var active = sess.status === "running" || sess.status === "paused";
+    var remaining = active ? remainingSecOverview() : 0;
+    var pct = active ? Math.max(0, Math.min(100, 100 - (remaining/sess.phaseDurationSec*100))) : 0;
+    var color = sess.phase==="break" ? "#5fc9b8" : "#e8a54b";
+
+    var timerHtml = l.timer.visible ? (
+      '<div class="ov-widget" style="left:'+l.timer.x+'%;top:'+l.timer.y+'%;width:'+l.timer.w+'%;height:'+l.timer.h+'%;">' +
+        '<div class="ov-timer">' +
+          '<div class="ov-phase" style="color:'+color+'"><span class="dot" style="background:'+color+'"></span>' +
+            (active ? (sess.status==="paused" ? "paused" : (sess.phase==="study"?"deep study":"on break")) : "ready") +
+          '</div>' +
+          '<div class="ov-digits" id="ovDigits">'+fmt(remaining)+'</div>' +
+          '<div class="ov-bar"><div class="ov-bar-fill" id="ovBarFill" style="width:'+pct+'%;background:'+color+'"></div></div>' +
+        '</div>' +
+      '</div>' ) : "";
+
+    var todoHtml = l.todo.visible ? (
+      '<div class="ov-widget" style="left:'+l.todo.x+'%;top:'+l.todo.y+'%;width:'+l.todo.w+'%;height:'+l.todo.h+'%;">' +
+        '<div class="ov-todo"><h4>to-do</h4><ul>' +
+          (state.todos.length ? state.todos.map(function(t){
+            return '<li class="'+(t.done?"done":"")+'"><span class="b"></span><span>'+esc(t.text)+'</span></li>';
+          }).join("") : '<li style="color:#7d8296;">no tasks</li>') +
+        '</ul></div>' +
+      '</div>' ) : "";
+
+    var flash = Date.now() < ovFlashUntil;
+    root.innerHTML = timerHtml + todoHtml + '<div class="ov-flash '+(flash?"show":"")+'"></div>';
+  }
+
+  function remainingSecOverview(){
+    var s = state.session;
+    if(s.status==="paused") return s.pausedRemainingSec||0;
+    if(!s.phaseStartTs) return 0;
+    return Math.max(0, s.phaseDurationSec - (Date.now()-s.phaseStartTs)/1000);
+  }
+
+  // ================= MASTER RENDER / TICK =================
+  function render(){
+    if(isOverview) renderOverview(); else renderDashboard();
+  }
+
+  var lastMissed = 0;
+  function tick(){
+    if(isOverview){
+      var stateChangedMissed = (state.stats.missedChecks||0) > lastMissed;
+      lastMissed = state.stats.missedChecks||0;
+      if(stateChangedMissed) ovFlashUntil = Date.now()+900;
+      renderOverview();
+    } else {
+      var s = state.session;
+      if(s.status === "running" && s.phaseStartTs){
+        var remaining = s.phaseDurationSec - (Date.now()-s.phaseStartTs)/1000;
+        if(remaining <= 0){ advancePhase(); return; }
+        var el = document.getElementById("timerDigits");
+        if(el) el.textContent = fmt(remaining);
+        var segCur = document.querySelector(".timeline-seg.current");
+        // timeline itself is static per block; nothing else to update per-tick
+      }
+      if(ui.checkOpen){
+        var cs = document.getElementById("checkSeconds");
+        if(cs && checkDeadlineTs) cs.textContent = Math.max(0, Math.ceil((checkDeadlineTs-Date.now())/1000));
+      }
+    }
+  }
+
+  // ================= INIT =================
+  function init(){
+    if(isOverview){
+      render();
+      setInterval(tick, 500);
+      if(fbReady) watchLive(); else renderStorageWarning();
+    } else {
+      loadOnce(function(){
+        render();
+        setInterval(tick, 500);
+        if(state.session.status === "running" && state.session.phase === "study"){
+          scheduleSuddenCheck();
+        }
+      });
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
